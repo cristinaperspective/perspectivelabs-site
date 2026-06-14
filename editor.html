@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perspective Labs — Site Editor</title>
+<style>
+  :root{--lime:#C8FF00;--base:#09070F;--bg:#100E1A;--surface:#16142A;--surface-2:#1E1C30;--border:#2E2C42;--text:#E6EDF3;--dim:#8B8FA8;--mono:'JetBrains Mono',ui-monospace,monospace;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--base);color:var(--text);font-family:var(--sans);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  /* top bar */
+  .bar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .brand{font-family:var(--mono);font-weight:700;font-size:15px}
+  .brand b{color:var(--lime)}
+  .spacer{flex:1}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:.15s}
+  .btn:hover{border-color:#3a3852}
+  .btn.primary{background:var(--lime);color:var(--base);border-color:var(--lime)}
+  .btn.primary:hover{filter:brightness(.95)}
+  .btn.ghost{background:transparent}
+  .status{font-size:12px;color:var(--dim);font-family:var(--mono);min-width:120px}
+  .hint{font-size:12px;color:var(--dim);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px}
+  .hint b{color:var(--lime)}
+  /* stage */
+  .stage{flex:1;position:relative;background:#000;overflow:hidden}
+  iframe{width:100%;height:100%;border:0;background:var(--base)}
+  .loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);color:var(--dim);font-size:14px}
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:min(520px,92vw);max-height:90vh;overflow:auto}
+  .modal h2{font-family:var(--mono);font-size:18px;margin-bottom:6px}
+  .modal p{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:18px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text)}
+  .field input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--base);color:var(--text);font-size:13px;font-family:var(--mono)}
+  .field small{display:block;color:var(--dim);font-size:11px;margin-top:6px;line-height:1.5}
+  .field small a{color:var(--lime)}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+  .log{font-family:var(--mono);font-size:12px;color:var(--dim);background:var(--base);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:14px;max-height:160px;overflow:auto;white-space:pre-wrap;display:none}
+  .log.show{display:block}
+  .ok{color:var(--lime)}.err{color:#FF7B72}
+  @media(max-width:680px){.hint{display:none}}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="brand">Perspective<b>Labs</b> · Editor</div>
+  <span class="hint">Click any <b>text</b> to edit · click any <b>photo</b> to replace</span>
+  <span class="spacer"></span>
+  <span class="status" id="status">loading…</span>
+  <button class="btn ghost" id="btnLinks">Links</button>
+  <button class="btn ghost" id="btnReload">Reload live</button>
+  <button class="btn ghost" id="btnDownload">Download</button>
+  <button class="btn ghost" id="btnSettings">⚙ Settings</button>
+  <button class="btn primary" id="btnPublish">Publish ↑</button>
+</div>
+
+<div class="stage">
+  <iframe id="frame" title="site preview"></iframe>
+  <div class="loading" id="loading">Loading your live site…</div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-bg" id="settingsModal">
+  <div class="modal">
+    <h2>Publish settings</h2>
+    <p>To publish with one click, paste a GitHub token. It is stored only in <b>this browser</b> (localStorage) and sent only to GitHub. You can always use “Download” instead and upload manually.</p>
+    <div class="field">
+      <label>GitHub token (fine-grained, Contents: Read &amp; Write)</label>
+      <input type="password" id="tokenInput" placeholder="github_pat_…">
+      <small>Create one at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">github.com → Settings → Developer settings → Fine-grained tokens</a>. Repository access: only <b>perspectivelabs-site</b>. Permission: <b>Contents → Read and write</b>.</small>
+    </div>
+    <div class="field">
+      <label>Repository owner</label>
+      <input id="ownerInput" value="cristinaperspective">
+    </div>
+    <div class="field">
+      <label>Repository name</label>
+      <input id="repoInput" value="perspectivelabs-site">
+    </div>
+    <div class="field">
+      <label>Branch</label>
+      <input id="branchInput" value="main">
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="settingsCancel">Cancel</button>
+      <button class="btn primary" id="settingsSave">Save</button>
+    </div>
+    <div class="log" id="settingsLog"></div>
+  </div>
+</div>
+
+<!-- LINKS MODAL -->
+<div class="modal-bg" id="linksModal">
+  <div class="modal">
+    <h2>Links</h2>
+    <p>These update everywhere on the page at once.</p>
+    <div class="field">
+      <label>“Book a call” button link</label>
+      <input id="bookingInput" placeholder="https://calendar.app.google/…">
+    </div>
+    <div class="field">
+      <label>Contact email</label>
+      <input id="emailInput" placeholder="cristina@perspectivecircle.com">
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="linksCancel">Cancel</button>
+      <button class="btn primary" id="linksApply">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- PUBLISH MODAL -->
+<div class="modal-bg" id="publishModal">
+  <div class="modal">
+    <h2>Publishing</h2>
+    <p>Saving your changes to the live site. This usually takes under a minute to appear on perspectivelabs.eu.</p>
+    <div class="log show" id="publishLog"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="publishClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="imgPicker" accept="image/*" style="display:none">
+
+<script>
+const RAW = name => `https://raw.githubusercontent.com/${cfg().owner}/${cfg().repo}/${cfg().branch}/${name}?cb=${Date.now()}`;
+const $ = id => document.getElementById(id);
+const frame = $('frame');
+let changedImages = {};   // filename -> dataURL
+let pendingImgEl = null;  // <img> awaiting a new file
+
+// ---------- config ----------
+function cfg(){
+  return {
+    token: localStorage.getItem('pl_token')||'',
+    owner: localStorage.getItem('pl_owner')||'cristinaperspective',
+    repo:  localStorage.getItem('pl_repo') ||'perspectivelabs-site',
+    branch:localStorage.getItem('pl_branch')||'main'
+  };
+}
+function setStatus(t){ $('status').textContent = t; }
+
+// ---------- editable selectors (all visible copy) ----------
+const EDITABLE = [
+  'h1.hero-title','.hero-sub','.hero-note','.press-label','.press-logo',
+  '.stat-num','.stat-label','.head h2','.lead','.why .wn','.why h3','.why p',
+  '.quote .qt','.attrib .an','.attrib .ar2','.partner','.svc-ix','.svc h3','.svc p','.svc li',
+  '.work-tag','.work-status','.work h3','.work p','.work-foot','.cta-inner h2','.cta-inner p',
+  '.contact-card h2','.ctext','.person .pn','.person .pr','.person .plabel',
+  '.foot-brand p','.foot-col h4','.foot-col a','.nav-links a','.member-info h3','.member-info .role','.member-info .tag'
+].join(',');
+
+const EDIT_STYLE = `
+  [data-ple]{outline:1px dashed transparent;outline-offset:3px;transition:outline-color .12s;cursor:text}
+  [data-ple]:hover{outline-color:rgba(200,255,0,.5)}
+  [data-ple]:focus{outline:2px solid #C8FF00 !important;border-radius:3px}
+  [data-plimg]{cursor:pointer;position:relative}
+  [data-plimg]:hover{outline:2px solid #C8FF00;outline-offset:-2px}
+  .pl-imgtag{position:absolute;top:8px;left:8px;background:#C8FF00;color:#09070F;font:600 11px/1 sans-serif;padding:5px 9px;border-radius:6px;z-index:9;pointer-events:none}
+`;
+
+// ---------- load ----------
+async function loadSite(){
+  $('loading').style.display='flex';
+  setStatus('loading…');
+  changedImages = {};
+  try{
+    const res = await fetch(RAW('index.html'));
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const html = await res.text();
+    frame.srcdoc = html;
+  }catch(e){
+    setStatus('load failed');
+    $('loading').textContent = 'Could not load the live site. Check your connection.';
+  }
+}
+
+frame.addEventListener('load', ()=>{
+  const doc = frame.contentDocument;
+  if(!doc || !doc.body || !doc.querySelector('.hero-title')) return; // not our content yet
+  inject(doc);
+  $('loading').style.display='none';
+  setStatus('ready to edit');
+});
+
+function inject(doc){
+  // editing styles
+  const st = doc.createElement('style'); st.id='pl-editor-style'; st.textContent=EDIT_STYLE; doc.head.appendChild(st);
+  // text editable
+  doc.querySelectorAll(EDITABLE).forEach(el=>{
+    el.setAttribute('contenteditable','true');
+    el.setAttribute('data-ple','1');
+  });
+  // stop links navigating while editing
+  doc.querySelectorAll('a').forEach(a=>a.addEventListener('click',e=>e.preventDefault()));
+  // images replaceable
+  doc.querySelectorAll('.photo img').forEach(img=>{
+    img.setAttribute('data-plimg','1');
+    img.setAttribute('data-plname', (img.getAttribute('src')||'img.png').split('/').pop().split('?')[0]);
+    addImgTag(doc,img.parentElement);
+    img.addEventListener('click',()=>{ pendingImgEl=img; $('imgPicker').click(); });
+  });
+  setStatus('ready to edit');
+}
+function addImgTag(doc,wrap){
+  if(!wrap || wrap.querySelector('.pl-imgtag')) return;
+  const t=doc.createElement('div'); t.className='pl-imgtag'; t.textContent='Replace photo'; wrap.appendChild(t);
+}
+
+// ---------- image replace ----------
+$('imgPicker').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f||!pendingImgEl) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const name = pendingImgEl.getAttribute('data-plname') || ('image-'+Date.now()+'.png');
+    pendingImgEl.setAttribute('data-plname',name);
+    pendingImgEl.src = r.result;          // live preview (dataURL)
+    changedImages[name] = r.result;        // remember for publish
+    setStatus('photo staged');
+  };
+  r.readAsDataURL(f);
+  e.target.value='';
+});
+
+// ---------- serialize ----------
+function serialize(){
+  const doc = frame.contentDocument;
+  const clone = doc.documentElement.cloneNode(true);
+  // remove editor style
+  const st = clone.querySelector('#pl-editor-style'); if(st) st.remove();
+  // remove image tags + restore img src to filename
+  clone.querySelectorAll('.pl-imgtag').forEach(n=>n.remove());
+  clone.querySelectorAll('[data-plimg]').forEach(img=>{
+    const name = img.getAttribute('data-plname');
+    if(name) img.setAttribute('src', name);
+  });
+  // strip editor attributes
+  clone.querySelectorAll('[data-ple]').forEach(el=>{ el.removeAttribute('contenteditable'); el.removeAttribute('data-ple'); });
+  clone.querySelectorAll('[data-plimg]').forEach(el=>{ el.removeAttribute('data-plimg'); el.removeAttribute('data-plname'); });
+  return '<!DOCTYPE html>\n'+clone.outerHTML;
+}
+
+// ---------- download ----------
+$('btnDownload').addEventListener('click',()=>{
+  const blob=new Blob([serialize()],{type:'text/html'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='index.html'; a.click();
+  setStatus('downloaded index.html');
+});
+
+// ---------- links ----------
+$('btnLinks').addEventListener('click',()=>{
+  const doc=frame.contentDocument;
+  const book=doc.querySelector('a[href*="calendar.app.google"]');
+  const mail=doc.querySelector('a[href^="mailto:"]');
+  $('bookingInput').value = book?book.getAttribute('href'):'';
+  $('emailInput').value = mail?mail.getAttribute('href').replace('mailto:',''):'';
+  show('linksModal');
+});
+$('linksApply').addEventListener('click',()=>{
+  const doc=frame.contentDocument;
+  const url=$('bookingInput').value.trim();
+  const mail=$('emailInput').value.trim();
+  if(url) doc.querySelectorAll('a[href*="calendar.app.google"]').forEach(a=>a.setAttribute('href',url));
+  if(mail){
+    doc.querySelectorAll('a[href^="mailto:"]').forEach(a=>a.setAttribute('href','mailto:'+mail));
+    const pe=doc.querySelector('.person .pe'); if(pe) pe.textContent=mail;
+  }
+  hide('linksModal'); setStatus('links updated');
+});
+
+// ---------- settings ----------
+$('btnSettings').addEventListener('click',()=>{
+  const c=cfg();
+  $('tokenInput').value=c.token; $('ownerInput').value=c.owner; $('repoInput').value=c.repo; $('branchInput').value=c.branch;
+  $('settingsLog').className='log';
+  show('settingsModal');
+});
+$('settingsSave').addEventListener('click',()=>{
+  localStorage.setItem('pl_token',$('tokenInput').value.trim());
+  localStorage.setItem('pl_owner',$('ownerInput').value.trim());
+  localStorage.setItem('pl_repo',$('repoInput').value.trim());
+  localStorage.setItem('pl_branch',$('branchInput').value.trim());
+  hide('settingsModal'); setStatus('settings saved');
+});
+
+// ---------- publish ----------
+const API = p => `https://api.github.com/repos/${cfg().owner}/${cfg().repo}/${p}`;
+function gh(path,opts={}){
+  return fetch(API(path),{...opts,headers:{'Authorization':'Bearer '+cfg().token,'Accept':'application/vnd.github+json',...(opts.headers||{})}});
+}
+function logp(msg,cls=''){ const l=$('publishLog'); l.innerHTML += `<span class="${cls}">${msg}</span>\n`; l.scrollTop=l.scrollHeight; }
+function b64utf8(str){ return btoa(unescape(encodeURIComponent(str))); }
+
+async function getSha(name){
+  const r = await gh(`contents/${encodeURIComponent(name)}?ref=${cfg().branch}`);
+  if(r.status===200){ const j=await r.json(); return j.sha; }
+  return null; // new file
+}
+async function putFile(name, base64, msg){
+  const sha = await getSha(name);
+  const body={message:msg,content:base64,branch:cfg().branch};
+  if(sha) body.sha=sha;
+  const r = await gh(`contents/${encodeURIComponent(name)}`,{method:'PUT',body:JSON.stringify(body)});
+  if(!r.ok){ const t=await r.text(); throw new Error(name+': '+r.status+' '+t.slice(0,120)); }
+}
+
+$('btnPublish').addEventListener('click',async ()=>{
+  if(!cfg().token){ alert('Add a GitHub token in ⚙ Settings first (or use Download to publish manually).'); $('btnSettings').click(); return; }
+  $('publishLog').innerHTML=''; show('publishModal');
+  try{
+    setStatus('publishing…');
+    // images first
+    const imgs=Object.keys(changedImages);
+    for(const name of imgs){
+      logp('Uploading '+name+' …');
+      const base64 = changedImages[name].split(',')[1];
+      await putFile(name, base64, 'Update '+name+' via editor');
+      logp('  ✓ '+name,'ok');
+    }
+    // html
+    logp('Saving page text …');
+    await putFile('index.html', b64utf8(serialize()), 'Update site content via editor');
+    logp('  ✓ index.html','ok');
+    logp('\nDone! Live in ~1 minute at perspectivelabs.eu','ok');
+    setStatus('published ✓');
+    changedImages={};
+  }catch(e){
+    logp('\nError: '+e.message,'err');
+    logp('Tip: check the token has Contents → Read & write on this repo.','err');
+    setStatus('publish failed');
+  }
+});
+
+// ---------- modal helpers ----------
+function show(id){ $(id).classList.add('show'); }
+function hide(id){ $(id).classList.remove('show'); }
+$('settingsCancel').onclick=()=>hide('settingsModal');
+$('linksCancel').onclick=()=>hide('linksModal');
+$('publishClose').onclick=()=>hide('publishModal');
+$('btnReload').onclick=()=>{ if(confirm('Reload from the live site? Unsaved edits will be lost.')) loadSite(); };
+
+// go
+loadSite();
+</script>
+</body>
+</html>
