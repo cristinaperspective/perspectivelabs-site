@@ -41,9 +41,28 @@
   .log.show{display:block}
   .ok{color:var(--lime)}.err{color:#FF7B72}
   @media(max-width:680px){.hint{display:none}}
+  /* login gate */
+  #login{position:fixed;inset:0;z-index:500;background:var(--base);display:flex;align-items:center;justify-content:center}
+  #login .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;width:min(380px,92vw);text-align:center}
+  #login .lk{font-family:var(--mono);font-weight:700;font-size:20px;margin-bottom:6px}
+  #login .lk b{color:var(--lime)}
+  #login p{font-size:13px;color:var(--dim);margin-bottom:20px}
+  #login input{width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--base);color:var(--text);font-size:14px;font-family:var(--mono);text-align:center;margin-bottom:12px}
+  #login button{width:100%;padding:12px;border-radius:8px;border:0;background:var(--lime);color:var(--base);font-weight:700;font-size:14px;cursor:pointer}
+  #login .err2{color:#FF7B72;font-size:12px;height:16px;margin-top:10px}
 </style>
 </head>
 <body>
+
+<div id="login">
+  <div class="card">
+    <div class="lk">Perspective<b>Labs</b></div>
+    <p>Enter the editor password</p>
+    <input type="password" id="pw" placeholder="password" autofocus>
+    <button id="pwBtn">Unlock</button>
+    <div class="err2" id="pwErr"></div>
+  </div>
+</div>
 
 <div class="bar">
   <div class="brand">Perspective<b>Labs</b> · Editor</div>
@@ -343,8 +362,33 @@ $('linksCancel').onclick=()=>hide('linksModal');
 $('publishClose').onclick=()=>hide('publishModal');
 $('btnReload').onclick=()=>{ if(confirm('Reload from the live site? Unsaved edits will be lost.')) loadSite(); };
 
-// go
-loadSite();
+// ---------- login gate ----------
+// Password is stored as a SHA-256 hash (not plain text). Current password: LabsCircle2026
+const PW_HASH = 'feb99c39cad9d87fc2beda9ea03f98251af351c7795a222621d14e857fc647dc';
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function tryLogin(){
+  const v = $('pw').value;
+  const h = await sha256(v);
+  if(h===PW_HASH){
+    sessionStorage.setItem('pl_auth','1');
+    $('login').style.display='none';
+    loadSite();
+  }else{
+    $('pwErr').textContent='Wrong password';
+    $('pw').value='';
+  }
+}
+$('pwBtn').addEventListener('click',tryLogin);
+$('pw').addEventListener('keydown',e=>{ if(e.key==='Enter') tryLogin(); });
+
+// go (only after auth)
+if(sessionStorage.getItem('pl_auth')==='1'){
+  $('login').style.display='none';
+  loadSite();
+}
 </script>
 </body>
 </html>
