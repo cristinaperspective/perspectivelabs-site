@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "slug": "test-post-delete-me",
+    "title": "Test post (delete me)",
+    "desc": "Testing the blog pipeline.",
+    "date": "2026-06-14",
+    "cover": ""
+  }
+]
