@@ -66,7 +66,7 @@
 
 <div class="bar">
   <div class="brand">Perspective<b>Labs</b> · Editor</div>
-  <span class="hint">Click any <b>text</b> to edit · click any <b>photo</b> to replace</span>
+  <span class="hint">Click <b>text</b> to edit · click <b>photo</b> to replace · hover a <b>card/section</b> for ↑↓ ⧉ 🗑 · <b>+ Add</b> for new items</span>
   <span class="spacer"></span>
   <span class="status" id="status">loading…</span>
   <button class="btn ghost" id="btnLinks">Links</button>
@@ -180,6 +180,16 @@ const EDIT_STYLE = `
   [data-plimg]{cursor:pointer;position:relative}
   [data-plimg]:hover{outline:2px solid #C8FF00;outline-offset:-2px}
   .pl-imgtag{position:absolute;top:8px;left:8px;background:#C8FF00;color:#09070F;font:600 11px/1 sans-serif;padding:5px 9px;border-radius:6px;z-index:9;pointer-events:none}
+  [data-plitem]{position:relative !important}
+  [data-plsec]{position:relative !important}
+  .pl-ui,.pl-sec{position:absolute;display:flex;gap:4px;z-index:30;opacity:0;transition:opacity .12s}
+  .pl-ui{top:6px;right:6px}
+  .pl-sec{top:8px;left:8px}
+  [data-plitem]:hover>.pl-ui,[data-plsec]:hover>.pl-sec{opacity:1}
+  .pl-ui button,.pl-sec button{font:600 11px/1 sans-serif;border:1px solid #2E2C42;border-radius:5px;padding:5px 7px;cursor:pointer;background:#16142A;color:#E6EDF3}
+  .pl-ui button:hover,.pl-sec button:hover{border-color:#C8FF00;color:#C8FF00}
+  .pl-ui .pl-del:hover,.pl-sec .pl-del:hover{border-color:#FF7B72;color:#FF7B72}
+  .pl-add{display:block;margin:16px auto 0;font:700 12px/1 sans-serif;background:#C8FF00;color:#09070F;border:0;border-radius:6px;padding:9px 16px;cursor:pointer}
 `;
 
 // ---------- load ----------
@@ -201,33 +211,113 @@ async function loadSite(){
 frame.addEventListener('load', ()=>{
   const doc = frame.contentDocument;
   if(!doc || !doc.body || !doc.querySelector('.hero-title')) return; // not our content yet
-  inject(doc);
+  if(!doc.getElementById('pl-editor-style')){
+    const st = doc.createElement('style'); st.id='pl-editor-style'; st.textContent=EDIT_STYLE; doc.head.appendChild(st);
+  }
+  injectAll(doc);
   $('loading').style.display='none';
   setStatus('ready to edit');
 });
 
-function inject(doc){
-  // editing styles
-  const st = doc.createElement('style'); st.id='pl-editor-style'; st.textContent=EDIT_STYLE; doc.head.appendChild(st);
+// repeating blocks: container + the item inside it
+const GROUPS = [
+  {wrap:'.stats-grid', item:'.stat'},
+  {wrap:'.why-grid', item:'.why'},
+  {wrap:'.quotes', item:'.quote'},
+  {wrap:'.press-row', item:'.press-logo'},
+  {wrap:'.partner-grid', item:'.partner'},
+  {wrap:'.svc-grid', item:'.svc'},
+  {wrap:'.work-grid', item:'.work'},
+  {wrap:'.team-grid', item:'.member'}
+];
+
+function injectAll(doc){
   // text editable
   doc.querySelectorAll(EDITABLE).forEach(el=>{
-    el.setAttribute('contenteditable','true');
-    el.setAttribute('data-ple','1');
+    if(el.closest('.pl-ui')||el.closest('.pl-sec')) return;
+    if(!el.hasAttribute('data-ple')){ el.setAttribute('contenteditable','true'); el.setAttribute('data-ple','1'); }
   });
-  // stop links navigating while editing
-  doc.querySelectorAll('a').forEach(a=>a.addEventListener('click',e=>e.preventDefault()));
-  // images replaceable
-  doc.querySelectorAll('.photo img').forEach(img=>{
-    img.setAttribute('data-plimg','1');
-    img.setAttribute('data-plname', (img.getAttribute('src')||'img.png').split('/').pop().split('?')[0]);
-    addImgTag(doc,img.parentElement);
-    img.addEventListener('click',()=>{ pendingImgEl=img; $('imgPicker').click(); });
+  // stop links navigating (bind once)
+  if(!doc.body.hasAttribute('data-pllinks')){
+    doc.body.setAttribute('data-pllinks','1');
+    doc.body.addEventListener('click',e=>{ const a=e.target.closest('a'); if(a) e.preventDefault(); }, true);
+  }
+  // images
+  doc.querySelectorAll('.photo img').forEach(img=>{ if(!img.hasAttribute('data-plimg')) setupImg(doc,img); });
+  // repeating items + "+ Add" button
+  GROUPS.forEach(g=>{
+    doc.querySelectorAll(g.wrap).forEach(wrap=>{
+      wrap.querySelectorAll(g.item).forEach(it=>{ if(!it.hasAttribute('data-plitem')) addItemUI(doc,it,wrap,g.item); });
+      const nx=wrap.nextElementSibling;
+      if(!nx || !nx.classList || !nx.classList.contains('pl-add')){
+        const add=doc.createElement('button'); add.className='pl-add'; add.type='button'; add.textContent='+ Add';
+        add.addEventListener('click',()=>addItem(doc,wrap,g.item));
+        wrap.insertAdjacentElement('afterend',add);
+      }
+    });
   });
-  setStatus('ready to edit');
+  // sections
+  doc.querySelectorAll('header.hero, section').forEach(sec=>{ if(!sec.hasAttribute('data-plsec')) addSecUI(doc,sec); });
 }
-function addImgTag(doc,wrap){
-  if(!wrap || wrap.querySelector('.pl-imgtag')) return;
-  const t=doc.createElement('div'); t.className='pl-imgtag'; t.textContent='Replace photo'; wrap.appendChild(t);
+
+function setupImg(doc,img){
+  const src=img.getAttribute('src')||'';
+  let name=src.split('/').pop().split('?')[0];
+  if(/^data:/.test(src) || !/\.(png|jpe?g|webp|gif)$/i.test(name)) name='image-'+Math.random().toString(36).slice(2,8)+'.png';
+  img.setAttribute('data-plimg','1'); img.setAttribute('data-plname',name);
+  const wrap=img.parentElement;
+  if(wrap && !wrap.querySelector('.pl-imgtag')){ const t=doc.createElement('div'); t.className='pl-imgtag'; t.textContent='Replace photo'; wrap.appendChild(t); }
+  img.addEventListener('click',()=>{ pendingImgEl=img; $('imgPicker').click(); });
+}
+
+function mkbtn(doc,label,cls,fn){
+  const b=doc.createElement('button'); b.type='button'; b.textContent=label; if(cls) b.className=cls;
+  b.addEventListener('click',e=>{ e.stopPropagation(); e.preventDefault(); fn(); }); return b;
+}
+
+function addItemUI(doc,it,wrap,itemSel){
+  it.setAttribute('data-plitem','1');
+  const bar=doc.createElement('div'); bar.className='pl-ui'; bar.setAttribute('contenteditable','false');
+  bar.appendChild(mkbtn(doc,'↑','',()=>{ const p=it.previousElementSibling; if(p&&p.matches&&p.matches(itemSel)) wrap.insertBefore(it,p); }));
+  bar.appendChild(mkbtn(doc,'↓','',()=>{ const n=it.nextElementSibling; if(n&&n.matches&&n.matches(itemSel)) wrap.insertBefore(n,it); }));
+  bar.appendChild(mkbtn(doc,'⧉','',()=>dupItem(doc,it)));
+  bar.appendChild(mkbtn(doc,'🗑','pl-del',()=>{ if(confirm('Delete this item?')) it.remove(); }));
+  it.appendChild(bar);
+}
+
+function addSecUI(doc,sec){
+  sec.setAttribute('data-plsec','1');
+  const bar=doc.createElement('div'); bar.className='pl-sec'; bar.setAttribute('contenteditable','false');
+  bar.appendChild(mkbtn(doc,'↑ section','',()=>moveSec(sec,-1)));
+  bar.appendChild(mkbtn(doc,'↓ section','',()=>moveSec(sec,1)));
+  bar.appendChild(mkbtn(doc,'🗑 section','pl-del',()=>{ if(confirm('Remove this whole section?')) sec.remove(); }));
+  sec.appendChild(bar);
+}
+function moveSec(sec,dir){
+  let sib=dir<0?sec.previousElementSibling:sec.nextElementSibling;
+  while(sib && !/^(SECTION|HEADER|FOOTER)$/.test(sib.tagName)) sib=dir<0?sib.previousElementSibling:sib.nextElementSibling;
+  if(!sib) return;
+  if(dir<0) sec.parentNode.insertBefore(sec,sib); else sec.parentNode.insertBefore(sib,sec);
+}
+
+function stripEditorArtifacts(root,forClone){
+  root.querySelectorAll('.pl-ui,.pl-sec,.pl-add,.pl-imgtag').forEach(n=>n.remove());
+  root.querySelectorAll('[data-plimg]').forEach(img=>{ const n=img.getAttribute('data-plname'); if(n && !forClone) img.setAttribute('src',n); img.removeAttribute('data-plimg'); img.removeAttribute('data-plname'); });
+  root.querySelectorAll('[data-ple]').forEach(el=>{ el.removeAttribute('contenteditable'); el.removeAttribute('data-ple'); });
+  root.querySelectorAll('[data-plitem]').forEach(el=>el.removeAttribute('data-plitem'));
+  root.querySelectorAll('[data-plsec]').forEach(el=>el.removeAttribute('data-plsec'));
+}
+
+function dupItem(doc,it){
+  const clone=it.cloneNode(true);
+  stripEditorArtifacts(clone,true); clone.removeAttribute('data-plitem');
+  it.after(clone); injectAll(doc); setStatus('item duplicated');
+}
+function addItem(doc,wrap,itemSel){
+  const items=wrap.querySelectorAll(itemSel); if(!items.length) return;
+  const clone=items[items.length-1].cloneNode(true);
+  stripEditorArtifacts(clone,true); clone.removeAttribute('data-plitem');
+  wrap.appendChild(clone); injectAll(doc); setStatus('item added');
 }
 
 // ---------- image replace ----------
@@ -249,17 +339,9 @@ $('imgPicker').addEventListener('change',e=>{
 function serialize(){
   const doc = frame.contentDocument;
   const clone = doc.documentElement.cloneNode(true);
-  // remove editor style
   const st = clone.querySelector('#pl-editor-style'); if(st) st.remove();
-  // remove image tags + restore img src to filename
-  clone.querySelectorAll('.pl-imgtag').forEach(n=>n.remove());
-  clone.querySelectorAll('[data-plimg]').forEach(img=>{
-    const name = img.getAttribute('data-plname');
-    if(name) img.setAttribute('src', name);
-  });
-  // strip editor attributes
-  clone.querySelectorAll('[data-ple]').forEach(el=>{ el.removeAttribute('contenteditable'); el.removeAttribute('data-ple'); });
-  clone.querySelectorAll('[data-plimg]').forEach(el=>{ el.removeAttribute('data-plimg'); el.removeAttribute('data-plname'); });
+  const body = clone.querySelector('body'); if(body) body.removeAttribute('data-pllinks');
+  stripEditorArtifacts(clone,false);
   return '<!DOCTYPE html>\n'+clone.outerHTML;
 }
 
