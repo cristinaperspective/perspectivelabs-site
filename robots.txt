@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /editor.html
+Disallow: /blog-admin.html
+Disallow: /optimizer.html
+
+Sitemap: https://perspectivelabs.eu/sitemap.xml
