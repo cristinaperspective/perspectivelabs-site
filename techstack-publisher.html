@@ -1,0 +1,23 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="robots" content="noindex"><title>TechStack</title><style>body{background:#0d0d12;color:#e6edf3;font-family:system-ui;max-width:700px;margin:0 auto;padding:32px}button{background:#C8FF00;border:0;border-radius:10px;padding:12px 20px;font-weight:700;cursor:pointer}pre{background:#000;border:1px solid #2e2c42;border-radius:8px;padding:14px;white-space:pre-wrap;margin-top:14px}.ok{color:#7CFC00}.err{color:#ff5c5c}</style></head><body><h1 style="font-size:18px">Tech Stack logos</h1><button id="run">Apply</button><pre id="log"></pre><script>const C={"logos":[{"slug":"claude","fallback":"anthropic","name":"Claude","link":"https://claude.ai"},{"slug":"openai","name":"OpenAI","link":"https://openai.com"},{"slug":"meta","name":"Meta","link":"https://about.meta.com"},{"slug":"google","name":"Google","link":"https://google.com"},{"slug":"tiktok","name":"TikTok","link":"https://www.tiktok.com"},{"slug":"klaviyo","name":"Klaviyo","link":"https://www.klaviyo.com"},{"slug":"shopify","name":"Shopify","link":"https://www.shopify.com"}],"NEWSEC":"<section class=\"partners\">\n<div class=\"container\">\n<p class=\"partners-label\">Tech stack</p>\n<div class=\"partners-row\" id=\"techStack\">\n<a href=\"https://claude.ai\" target=\"_blank\" rel=\"noopener\" class=\"tech-logo\"><img src=\"/images/tech/claude.svg\" alt=\"Claude\"></a>\n<a href=\"https://openai.com\" target=\"_blank\" rel=\"noopener\" class=\"tech-logo\"><img src=\"/images/tech/openai.svg\" alt=\"OpenAI\"></a>\n<a href=\"https://about.meta.com\" target=\"_blank\" rel=\"noopener\" class=\"tech-logo\"><img src=\"/images/tech/meta.svg\" alt=\"Meta\"></a>\n<a href=\"https://google.com\" target=\"_blank\" rel=\"noopener\" class=\"tech-logo\"><img src=\"/images/tech/google.svg\" alt=\"Google\"></a>\n<a href=\"https://www.tiktok.com\" target=\"_blank\" rel=\"noopener\" class=\"tech-logo\"><img src=\"/images/tech/tiktok.svg\" alt=\"TikTok\"></a>\n<a href=\"https://www.klaviyo.com\" target=\"_blank\" rel=\"noopener\" class=\"tech-logo\"><img src=\"/images/tech/klaviyo.svg\" alt=\"Klaviyo\"></a>\n<a href=\"https://www.shopify.com\" target=\"_blank\" rel=\"noopener\" class=\"tech-logo\"><img src=\"/images/tech/shopify.svg\" alt=\"Shopify\"></a>\n</div>\n</div>\n</section>","techCSS":".partners-row .tech-logo{display:inline-flex;align-items:center}.partners-row .tech-logo img{height:30px;width:auto;opacity:.72;transition:opacity .2s}.partners-row .tech-logo:hover img{opacity:1}"};const log=document.getElementById('log');function L(m,c){const s=document.createElement('span');if(c)s.className=c;s.textContent=m+'\n';log.appendChild(s);}
+function tk(){return (localStorage.getItem('pl_token')||'').trim();}function b64u(s){return btoa(unescape(encodeURIComponent(s)));}
+function gh(p,o={}){return fetch('https://api.github.com/repos/cristinaperspective/perspectivesocial/'+p,{...o,headers:{'Authorization':'Bearer '+tk(),'Accept':'application/vnd.github+json',...(o.headers||{})}});}
+async function gs(p){const r=await gh('contents/'+p+'?ref=main&t='+Date.now());return r.status===200?(await r.json()).sha:null;}
+async function put(p,b,m){const sha=await gs(p);const body={message:m,content:b,branch:'main'};if(sha)body.sha=sha;const r=await gh('contents/'+p,{method:'PUT',body:JSON.stringify(body)});if(!r.ok)throw new Error(p+' '+r.status);}
+document.getElementById('run').onclick=async()=>{log.textContent='';if(!tk()){L('No token','err');return;}
+ try{
+  for(const l of C.logos){
+    let svg=await fetch('https://cdn.simpleicons.org/'+l.slug+'/ffffff').then(r=>r.ok?r.text():null);
+    if(!svg&&l.fallback)svg=await fetch('https://cdn.simpleicons.org/'+l.fallback+'/ffffff').then(r=>r.ok?r.text():null);
+    if(!svg){L('  ! logo '+l.slug+' FAILED','err');continue;}
+    await put('images/tech/'+l.slug+'.svg',b64u(svg),'tech logo '+l.slug);L('  ✓ '+l.slug,'ok');
+  }
+  const r=await gh('contents/index.html?ref=main&t='+Date.now());const j=await r.json();let h=decodeURIComponent(escape(atob(j.content.replace(/\s/g,''))));
+  if(h.indexOf('id="techStack"')>-1){L('tech stack already in index','err');}else{
+    h=h.replace('transition:opacity .25s ease,transform .25s ease}','transition:opacity .25s ease,transform .25s ease}\n'+C.techCSS);
+    const re=/<section class="partners">[\s\S]*?<\/section>/;
+    if(!re.test(h)){L('  ! partners section not found','err');}else{h=h.replace(re,C.NEWSEC);
+      await put('index.html',b64u(h),'Tech Stack logos');L('  ✓ index.html tech stack','ok');}
+  }
+  L('\nDone.','ok');
+ }catch(e){L('! '+e.message,'err');}
+};</script></body></html>
