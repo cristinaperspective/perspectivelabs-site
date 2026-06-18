@@ -1,0 +1,38 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Klaviyo Logo Fix</title>
+<style>body{font-family:system-ui;background:#111;color:#eee;padding:30px}button{background:#FF3D1F;color:#fff;border:0;padding:14px 28px;font-size:16px;border-radius:6px;cursor:pointer}#log{margin-top:20px;white-space:pre-wrap;font-family:monospace;font-size:12px}#prev{background:#16142A;padding:20px;margin-top:14px;display:inline-block}#prev img{height:40px}</style>
+</head><body><h2>Fix Klaviyo logo (real wordmark, white, tight)</h2><button id="go">Fetch + Deploy</button>
+<div id="prev"></div><div id="log"></div>
+<script>
+var OWNER='cristinaperspective',REPO='perspectivesocial',BRANCH='main';
+function log(m){document.getElementById('log').textContent+=m+"\n";}
+function tok(){return localStorage.getItem('pl_token')||'';}
+function gh(p,o){o=o||{};return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+p,{method:o.method||'GET',headers:{'Authorization':'token '+tok(),'Accept':'application/vnd.github+json'},body:o.body||undefined});}
+async function getSha(p){var r=await gh('contents/'+p+'?ref='+BRANCH+'&t='+Date.now());if(r.status===200)return (await r.json()).sha;return null;}
+function b64u(s){return btoa(unescape(encodeURIComponent(s)));}
+var SOURCES=[
+ 'https://cdn.simpleicons.org/klaviyo/white',
+ 'https://cdn.simpleicons.org/klaviyo',
+ 'https://www.vectorlogo.zone/logos/klaviyo/klaviyo-ar21.svg',
+ 'https://cdn.worldvectorlogo.com/logos/klaviyo.svg',
+ 'https://www.vectorlogo.zone/logos/klaviyo/klaviyo-icon.svg'
+];
+function whiten(svg){
+ // force every fill to white; add a default fill on root if none
+ svg=svg.replace(/fill\s*=\s*"(?!none)[^"]*"/gi,'fill="#ffffff"');
+ svg=svg.replace(/fill\s*:\s*#[0-9a-fA-F]{3,8}/g,'fill:#ffffff');
+ svg=svg.replace(/<svg /i,'<svg fill="#ffffff" ');
+ return svg;
+}
+async function tryFetch(u){try{var r=await fetch(u,{mode:'cors'});if(!r.ok)return null;var t=await r.text();if(t.indexOf('<svg')<0)return null;return t.slice(t.indexOf('<svg'));}catch(e){return null;}}
+document.getElementById('go').onclick=async function(){this.disabled=true;try{
+ if(!tok()){log('no token');return;}
+ var svg=null,used=null;
+ for(var i=0;i<SOURCES.length;i++){log('trying '+SOURCES[i]+' …');svg=await tryFetch(SOURCES[i]);if(svg){used=SOURCES[i];break;}}
+ if(!svg){log('All sources blocked/failed. Tell Claude to hand-build.');return;}
+ log('got logo from: '+used+' ('+svg.length+' bytes)');
+ var white=whiten(svg);
+ document.getElementById('prev').innerHTML='<img src="data:image/svg+xml;utf8,'+encodeURIComponent(white)+'">';
+ for(var a=0;a<3;a++){var sha=await getSha('images/tech/klaviyo.svg');var b={message:'Real Klaviyo logo (white)',content:b64u(white),branch:BRANCH};if(sha)b.sha=sha;var pr=await gh('contents/images/tech/klaviyo.svg',{method:'PUT',body:JSON.stringify(b)});if(pr.ok){log('OK klaviyo.svg deployed');break;}if(pr.status===409&&a<2){await new Promise(s=>setTimeout(s,600));continue;}log('ERR '+pr.status+' '+(await pr.text()).slice(0,140));break;}
+ log('Done.');
+}catch(e){log('ERROR '+e.message);}};
+</script></body></html>
