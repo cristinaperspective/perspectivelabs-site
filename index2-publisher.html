@@ -1,0 +1,74 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Index2 Publisher</title>
+<style>body{font-family:system-ui;background:#111;color:#eee;padding:30px;max-width:720px;margin:0 auto}button{background:#FF3D1F;color:#fff;border:0;padding:14px 28px;font-size:16px;border-radius:6px;cursor:pointer}#log{margin-top:20px;white-space:pre-wrap;font-family:monospace;font-size:13px;line-height:1.6}</style>
+</head><body>
+<h2>Deploy Tech-stack labels + Press marquee (perspectivesocial)</h2>
+<button id="go">Deploy</button>
+<div id="log"></div>
+<script>
+var OWNER='cristinaperspective',REPO='perspectivesocial',BRANCH='main';
+function log(m){document.getElementById('log').textContent+=m+"\n";}
+function tok(){return localStorage.getItem('pl_token')||'';}
+function gh(path,opt){opt=opt||{};return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+path,{method:opt.method||'GET',headers:{'Authorization':'token '+tok(),'Accept':'application/vnd.github+json'},body:opt.body||undefined});}
+function b64u(s){return btoa(unescape(encodeURIComponent(s)));}
+function ub64(b){return decodeURIComponent(escape(atob(b.replace(/\n/g,''))));}
+async function getSha(p){var r=await gh('contents/'+p+'?ref='+BRANCH+'&t='+Date.now());if(r.status===200)return (await r.json()).sha;return null;}
+async function put(p,b64,msg){for(var a=0;a<3;a++){var sha=await getSha(p);var body={message:msg,content:b64,branch:BRANCH};if(sha)body.sha=sha;var r=await gh('contents/'+p,{method:'PUT',body:JSON.stringify(body)});if(r.ok){log('OK '+p);return;}if(r.status===409&&a<2){await new Promise(function(s){setTimeout(s,600);});continue;}throw new Error(p+': '+r.status+' '+(await r.text()).slice(0,140));}}
+
+var TECH=[
+{name:'Claude',image:'/images/tech/claude.svg',link:'https://claude.ai'},
+{name:'OpenAI',image:'/images/tech/openai.svg',link:'https://openai.com'},
+{name:'Meta',image:'/images/tech/meta.svg',link:'https://about.meta.com'},
+{name:'Google',image:'/images/tech/google.svg',link:'https://google.com'},
+{name:'TikTok',image:'/images/tech/tiktok.svg',link:'https://www.tiktok.com'},
+{name:'Klaviyo',image:'/images/tech/klaviyo.svg',link:'https://www.klaviyo.com'},
+{name:'Shopify',image:'/images/tech/shopify.svg',link:'https://www.shopify.com'}
+];
+var PRESS=[
+{name:'The Irish Times',serif:true},
+{name:'Irish Independent',serif:true},
+{name:'RTÉ',serif:false},
+{name:'Business Post',serif:true},
+{name:'Forbes',serif:true},
+{name:'Business Insider',serif:false},
+{name:'Entrepreneur',serif:false},
+{name:'USA Today',serif:false},
+{name:'Yahoo News',serif:false},
+{name:'Digital Journal',serif:false},
+{name:'International Business Times',serif:true},
+{name:'Above the Law',serif:true},
+{name:'Healthline',serif:false},
+{name:'Law.com',serif:true},
+{name:'Automotive News',serif:true},
+{name:'Motor1',serif:false}
+];
+function techMarkup(){return TECH.map(function(t){return '<a href="'+t.link+'" target="_blank" rel="noopener" class="tech-logo"><img src="'+t.image+'" alt="'+t.name+'"><span>'+t.name+'</span></a>';}).join('\n');}
+function pressSpans(){return PRESS.map(function(p){return '<span class="pub'+(p.serif?' serif':'')+'">'+p.name+'</span>';}).join('');}
+
+var NEWTECHCSS='.partners-row{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;}';
+var OLDTECHCSS='.partners-row{display:flex;align-items:center;justify-content:center;gap:clamp(24px,5vw,56px);flex-wrap:wrap;}';
+var OLDLOGOCSS='.partners-row .tech-logo{display:inline-flex;align-items:center}.partners-row .tech-logo img{height:30px;width:auto;opacity:.72;transition:opacity .2s}.partners-row .tech-logo:hover img{opacity:1}';
+var NEWLOGOCSS='.partners-row .tech-logo{display:inline-flex;flex-direction:column;align-items:center;gap:12px;flex:1 1 0;min-width:84px}.partners-row .tech-logo img{height:32px;width:auto;opacity:.72;transition:opacity .2s}.partners-row .tech-logo:hover img{opacity:1}.partners-row .tech-logo span{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,240,236,.55)}';
+var PRESSCSS='\n.press-marquee{overflow:hidden;margin-top:30px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);}\n.press-track{display:flex;gap:clamp(32px,5vw,60px);width:max-content;animation:pressScroll 60s linear infinite;align-items:center;}\n.press-track:hover{animation-play-state:paused;}\n.press-track .pub{font-family:\'Anton\',sans-serif;font-size:clamp(19px,2.4vw,30px);letter-spacing:.01em;color:var(--dark);opacity:.6;white-space:nowrap;}\n.press-track .pub.serif{font-family:Georgia,\'Times New Roman\',serif;font-weight:700;font-style:italic;}\n@keyframes pressScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}\n';
+var RENDERJS='\n<script>(function(){function rt(items){var el=document.getElementById("techStack");if(!el||!items||!items.length)return;el.innerHTML=items.map(function(t){return \'<a href="\'+t.link+\'" target="_blank" rel="noopener" class="tech-logo"><img src="\'+t.image+\'" alt="\'+t.name+\'"><span>\'+t.name+\'</span></a>\';}).join("");}function rp(items){var el=document.getElementById("pressTrack");if(!el||!items||!items.length)return;var one=items.map(function(p){return \'<span class="pub\'+(p.serif?" serif":"")+\'">\'+p.name+\'</span>\';}).join("");el.innerHTML=one+one;}fetch("data/techstack.json").then(function(r){return r.json();}).then(function(d){rt(d.items||d);}).catch(function(){});fetch("data/press.json").then(function(r){return r.json();}).then(function(d){rp(d.items||d);}).catch(function(){});})();<\/script>\n';
+
+async function run(){
+ await put('data/techstack.json',b64u(JSON.stringify({items:TECH},null,2)),'Tech stack data');
+ await put('data/press.json',b64u(JSON.stringify({items:PRESS},null,2)),'Press / featured-in data');
+ var r=await gh('contents/index.html?ref='+BRANCH+'&t='+Date.now());var j=await r.json();var sha=j.sha;var html=ub64(j.content);
+ // CSS
+ if(html.indexOf(OLDTECHCSS)>-1)html=html.replace(OLDTECHCSS,NEWTECHCSS);else log('warn: partners-row css not matched');
+ if(html.indexOf(OLDLOGOCSS)>-1)html=html.replace(OLDLOGOCSS,NEWLOGOCSS);else log('warn: tech-logo css not matched');
+ if(html.indexOf('.press-track')<0)html=html.replace('</style>',PRESSCSS+'</style>');
+ // tech markup
+ html=html.replace(/<div class="partners-row" id="techStack">[\s\S]*?<\/div>/,'<div class="partners-row" id="techStack">\n'+techMarkup()+'\n</div>');
+ // press markup
+ var marquee='<div class="press-marquee" aria-hidden="true"><div class="press-track" id="pressTrack">'+pressSpans()+pressSpans()+'</div></div>';
+ html=html.replace(/<div class="press-row">[\s\S]*?<\/div>/,marquee);
+ // also update the label wording stays "get featured in"
+ // render JS (idempotent)
+ if(html.indexOf('data/techstack.json')<0)html=html.replace('</body>',RENDERJS+'</body>');
+ var nb=b64u(html);
+ for(var a=0;a<3;a++){var pr=await gh('contents/index.html',{method:'PUT',body:JSON.stringify({message:'Tech stack labels + spread + press marquee',content:nb,branch:BRANCH,sha:sha})});if(pr.ok){log('OK index.html');return;}if(pr.status===409&&a<2){var g=await gh('contents/index.html?ref='+BRANCH+'&t='+Date.now());var gj=await g.json();sha=gj.sha;continue;}throw new Error('index.html: '+pr.status+' '+(await pr.text()).slice(0,140));}
+}
+document.getElementById('go').onclick=async function(){this.disabled=true;try{if(!tok()){log('No pl_token here.');return;}await run();log('Done.');}catch(e){log('ERROR '+e.message);}};
+</script></body></html>
