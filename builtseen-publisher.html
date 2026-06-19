@@ -1,0 +1,40 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Built To Be Seen Restructure</title>
+<style>body{font-family:system-ui;background:#111;color:#eee;padding:30px}button{background:#FF3D1F;color:#fff;border:0;padding:14px 28px;font-size:16px;border-radius:6px;cursor:pointer}#log{margin-top:20px;white-space:pre-wrap;font-family:monospace;font-size:12px}</style>
+</head><body><h2>Restructure: nav to footer + per-pillar sliders + remove BTS</h2><button id="go">Deploy</button><div id="log"></div>
+<script>
+var OWNER='cristinaperspective',REPO='perspectivesocial',BRANCH='main',PH="PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTAwMCI+CjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iMTAwMCIgZmlsbD0iI0RERTlERiIvPgo8cmVjdCB4PSIxIiB5PSIxIiB3aWR0aD0iNzk4IiBoZWlnaHQ9Ijk5OCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQThDMEFEIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1kYXNoYXJyYXk9IjE0IDEyIi8+CjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzdBOUU4NCIgc3Ryb2tlLXdpZHRoPSIxNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KPHJlY3QgeD0iMzAwIiB5PSI0MzAiIHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiByeD0iMTYiLz4KPGNpcmNsZSBjeD0iNDAwIiBjeT0iNTA1IiByPSI0MCIvPgo8cGF0aCBkPSJNMzQ4IDQzMCBsMTggLTMwIGg2OCBsMTggMzAiLz4KPC9nPgo8dGV4dCB4PSI0MDAiIHk9IjY1MCIgZm9udC1mYW1pbHk9IkFyaWFsLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzQiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIzIiBmaWxsPSIjMkMzMzJFIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BREQgWU9VUiBQSE9UTzwvdGV4dD4KPHRleHQgeD0iNDAwIiB5PSI2OTAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjIwIiBmaWxsPSIjN0E5RTg0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5jbGljayB0byByZXBsYWNlIGluIHRoZSBlZGl0b3I8L3RleHQ+Cjwvc3ZnPg==";
+function log(m){document.getElementById('log').textContent+=m+"\n";}
+function tok(){return localStorage.getItem('pl_token')||'';}
+function gh(p,o){o=o||{};return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+p,{method:o.method||'GET',headers:{'Authorization':'token '+tok(),'Accept':'application/vnd.github+json'},body:o.body||undefined});}
+function b64u(s){return btoa(unescape(encodeURIComponent(s)));}
+function ub64(b){return decodeURIComponent(escape(atob(b.replace(/\n/g,''))));}
+async function getSha(p){var r=await gh('contents/'+p+'?ref='+BRANCH+'&t='+Date.now());if(r.status===200)return (await r.json()).sha;return null;}
+async function put(p,c,msg){for(var a=0;a<3;a++){var sha=await getSha(p);var b={message:msg,content:c,branch:BRANCH};if(sha)b.sha=sha;var r=await gh('contents/'+p,{method:'PUT',body:JSON.stringify(b)});if(r.ok){log('OK '+p);return;}if(r.status===409&&a<2){await new Promise(s=>setTimeout(s,400));continue;}throw new Error(p+': '+r.status+' '+(await r.text()).slice(0,120));}}
+var CSS='\n.svc-slider{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;aspect-ratio:16/11;border-radius:8px;margin-bottom:18px;background:var(--light-sage);-webkit-overflow-scrolling:touch;scrollbar-width:none}\n.svc-slider::-webkit-scrollbar{display:none}\n.svc-slider img{flex:0 0 100%;width:100%;height:100%;object-fit:cover;scroll-snap-align:start;display:block}\n.svc:hover .svc-slider{background:var(--charcoal)}\n.footer-nav{display:flex;gap:22px;flex-wrap:wrap}\n.footer-nav a{font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(245,240,236,0.7);transition:color .2s}\n.footer-nav a:hover{color:var(--orange)}\n';
+async function run(){
+ var r=await gh('contents/index.html?ref='+BRANCH+'&t='+Date.now());var j=await r.json();var sha=j.sha;var html=ub64(j.content);
+ // 1) remove Partners + Careers from top nav
+ html=html.replace('<a href="/strategic-partners.html">Partners</a>\n','').replace('<a href="/careers.html">Careers</a>\n','');
+ html=html.replace('<a href="/strategic-partners.html">Partners</a>','').replace('<a href="/careers.html">Careers</a>','');
+ // 2) footer: add footer-nav (idempotent)
+ if(html.indexOf('footer-nav')<0){
+   html=html.replace('<span class="footer-tag">SMM &middot; Content &middot; Digital PR &middot; Newsletters &middot; Podcasts</span>','<nav class="footer-nav"><a href="/strategic-partners.html">Strategic Partners</a><a href="/careers.html">Careers</a><a href="/blog/">Blog</a><a href="#contact">Contact</a></nav>');
+   html=html.replace('<span class="footer-tag">SMM · Content · Digital PR · Newsletters · Podcasts</span>','<nav class="footer-nav"><a href="/strategic-partners.html">Strategic Partners</a><a href="/careers.html">Careers</a><a href="/blog/">Blog</a><a href="#contact">Contact</a></nav>');
+ }
+ // 3) remove Behind-the-scenes section
+ html=html.replace(/<section class="bts"[\s\S]*?<\/section>\s*/,'');
+ // 4) inject per-pillar slider into each .svc (idempotent)
+ if(html.indexOf('svc-slider')<0){
+   var idx=0;
+   html=html.replace(/<div class="svc">/g,function(m){idx++;var g='<div class="svc-slider">';for(var k=1;k<=3;k++){g+='<img src="images/services/p'+idx+'-'+k+'.svg" alt="">';}g+='</div>';return '<div class="svc">'+g;});
+ }
+ // 5) CSS
+ if(html.indexOf('.svc-slider')<0||html.indexOf('.footer-nav')<0){html=html.replace('</style>',CSS+'</style>');}
+ // 6) auto-advance script
+ if(html.indexOf('svcAutoSlide')<0){var sc='\n<script>/*svcAutoSlide*/(function(){var sl=document.querySelectorAll(".svc-slider");sl.forEach(function(s,i){var n=s.children.length;if(n<2)return;var c=0;setInterval(function(){c=(c+1)%n;s.scrollTo({left:c*s.clientWidth,behavior:"smooth"});},3600+i*220);});})();<\/script>\n';html=html.replace('</body>',sc+'</body>');}
+ // PUT 24 service placeholders
+ for(var p=1;p<=8;p++){for(var k=1;k<=3;k++){await put('images/services/p'+p+'-'+k+'.svg',PH,'Service pillar photo placeholder '+p+'-'+k);}}
+ for(var a=0;a<3;a++){var pr=await gh('contents/index.html',{method:'PUT',body:JSON.stringify({message:'Built to be seen per-pillar sliders; nav to footer; remove BTS',content:b64u(html),branch:BRANCH,sha:sha})});if(pr.ok){log('OK index.html');return;}if(pr.status===409&&a<2){var g=await gh('contents/index.html?ref='+BRANCH+'&t='+Date.now());var gj=await g.json();sha=gj.sha;continue;}throw new Error('index '+pr.status);}
+}
+document.getElementById('go').onclick=async function(){this.disabled=true;try{if(!tok()){log('no token');return;}await run();log('Done.');}catch(e){log('ERROR '+e.message);}};
+</script></body></html>
