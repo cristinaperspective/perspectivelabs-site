@@ -1,0 +1,26 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gallery Publisher</title>
+<style>body{font-family:system-ui;background:#111;color:#eee;padding:30px}button{background:#FF3D1F;color:#fff;border:0;padding:14px 28px;font-size:16px;border-radius:6px;cursor:pointer}#log{margin-top:20px;white-space:pre-wrap;font-family:monospace;font-size:12px}</style>
+</head><body><h2>Deploy Behind-the-scenes gallery + placeholders</h2><button id="go">Deploy</button><div id="log"></div>
+<script>
+var OWNER='cristinaperspective',REPO='perspectivesocial',BRANCH='main',PH="PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTAwMCI+CjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iMTAwMCIgZmlsbD0iI0RERTlERiIvPgo8cmVjdCB4PSIxIiB5PSIxIiB3aWR0aD0iNzk4IiBoZWlnaHQ9Ijk5OCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQThDMEFEIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1kYXNoYXJyYXk9IjE0IDEyIi8+CjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzdBOUU4NCIgc3Ryb2tlLXdpZHRoPSIxNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KPHJlY3QgeD0iMzAwIiB5PSI0MzAiIHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiByeD0iMTYiLz4KPGNpcmNsZSBjeD0iNDAwIiBjeT0iNTA1IiByPSI0MCIvPgo8cGF0aCBkPSJNMzQ4IDQzMCBsMTggLTMwIGg2OCBsMTggMzAiLz4KPC9nPgo8dGV4dCB4PSI0MDAiIHk9IjY1MCIgZm9udC1mYW1pbHk9IkFyaWFsLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzQiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIzIiBmaWxsPSIjMkMzMzJFIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BREQgWU9VUiBQSE9UTzwvdGV4dD4KPHRleHQgeD0iNDAwIiB5PSI2OTAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjIwIiBmaWxsPSIjN0E5RTg0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5jbGljayB0byByZXBsYWNlIGluIHRoZSBlZGl0b3I8L3RleHQ+Cjwvc3ZnPg==";
+function log(m){document.getElementById('log').textContent+=m+"\n";}
+function tok(){return localStorage.getItem('pl_token')||'';}
+function gh(p,o){o=o||{};return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+p,{method:o.method||'GET',headers:{'Authorization':'token '+tok(),'Accept':'application/vnd.github+json'},body:o.body||undefined});}
+function b64u(s){return btoa(unescape(encodeURIComponent(s)));}
+function ub64(b){return decodeURIComponent(escape(atob(b.replace(/\n/g,''))));}
+async function getSha(p){var r=await gh('contents/'+p+'?ref='+BRANCH+'&t='+Date.now());if(r.status===200)return (await r.json()).sha;return null;}
+async function put(p,c,msg){for(var a=0;a<3;a++){var sha=await getSha(p);var b={message:msg,content:c,branch:BRANCH};if(sha)b.sha=sha;var r=await gh('contents/'+p,{method:'PUT',body:JSON.stringify(b)});if(r.ok){log('OK '+p);return;}if(r.status===409&&a<2){await new Promise(s=>setTimeout(s,500));continue;}throw new Error(p+': '+r.status+' '+(await r.text()).slice(0,120));}}
+var GCSS='\n.bts{background:var(--off-white);padding:90px 0 96px}\n.bts-head{margin-bottom:40px}\n.bts-gallery{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 32px 16px;-webkit-overflow-scrolling:touch}\n.bts-gallery::-webkit-scrollbar{height:8px}.bts-gallery::-webkit-scrollbar-thumb{background:rgba(22,26,23,.2);border-radius:4px}\n.bts-tile{flex:0 0 auto;width:clamp(220px,26vw,300px);aspect-ratio:4/5;border-radius:10px;overflow:hidden;scroll-snap-align:start;background:var(--light-sage);display:block}\n.bts-tile img{width:100%;height:100%;object-fit:cover}\n';
+function tiles(){var s='';for(var i=1;i<=8;i++){s+='<a class="bts-tile"><img src="images/team/shot-'+i+'.svg" alt="Perspective Social behind the scenes"></a>\n';}return s;}
+var SECTION='<section class="bts" id="behind">\n<div class="container">\n<div class="bts-head"><p class="eyebrow">Behind the scenes</p><h2 class="section-title">THE TEAM,<br>AT <span class="accent">WORK.</span></h2></div>\n</div>\n<div class="bts-gallery" id="btsGallery">\n'+tiles()+'</div>\n</section>\n\n';
+async function run(){
+ for(var i=1;i<=8;i++){await put('images/team/shot-'+i+'.svg',PH,'Add team photo placeholder '+i);}
+ var r=await gh('contents/index.html?ref='+BRANCH+'&t='+Date.now());var j=await r.json();var sha=j.sha;var html=ub64(j.content);
+ if(html.indexOf('bts-gallery')<0){
+   if(html.indexOf('.press-track')>-1){html=html.replace('</style>',GCSS+'</style>');}
+   html=html.replace('<!-- WORK -->',SECTION+'<!-- WORK -->');
+ } else {log('gallery already present');}
+ for(var a=0;a<3;a++){var pr=await gh('contents/index.html',{method:'PUT',body:JSON.stringify({message:'Behind-the-scenes sliding gallery',content:b64u(html),branch:BRANCH,sha:sha})});if(pr.ok){log('OK index.html');return;}if(pr.status===409&&a<2){var g=await gh('contents/index.html?ref='+BRANCH+'&t='+Date.now());var gj=await g.json();sha=gj.sha;continue;}throw new Error('index '+pr.status);}
+}
+document.getElementById('go').onclick=async function(){this.disabled=true;try{if(!tok()){log('no token');return;}await run();log('Done.');}catch(e){log('ERROR '+e.message);}};
+</script></body></html>
