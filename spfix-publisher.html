@@ -1,0 +1,21 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>SP path fix</title>
+<style>body{font-family:system-ui;background:#111;color:#eee;padding:30px}button{background:#FF3D1F;color:#fff;border:0;padding:14px 28px;font-size:16px;border-radius:6px;cursor:pointer}#log{margin-top:20px;white-space:pre-wrap;font-family:monospace;font-size:12px}</style>
+</head><body><h2>Fix partners.json path + SEED on strategic-partners.html</h2><button id="go">Deploy</button><div id="log"></div>
+<script>
+var OWNER='cristinaperspective',REPO='perspectivesocial',BRANCH='main';
+function log(m){document.getElementById('log').textContent+=m+"\n";}
+function tok(){return localStorage.getItem('pl_token')||'';}
+function gh(p,o){o=o||{};return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+p,{method:o.method||'GET',headers:{'Authorization':'token '+tok(),'Accept':'application/vnd.github+json'},body:o.body||undefined});}
+function b64u(s){return btoa(unescape(encodeURIComponent(s)));}
+function ub64(b){return decodeURIComponent(escape(atob(b.replace(/\n/g,''))));}
+async function getSha(p){var r=await gh('contents/'+p+'?ref='+BRANCH+'&t='+Date.now());if(r.status===200)return (await r.json()).sha;return null;}
+var NEWSEED='var SEED={featured:"loveloyalty",partners:[{slug:"loveloyalty",name:"Love Loyalty",category:"Loyalty & Retention",image:"/images/partners/loveloyalty.svg",link:"https://www.loveloyalty.app/",desc:"An all-in-one retention platform with an intuitive loyalty points program, VIP tiers, referrals and memberships that turn first-time buyers into regulars."}]};';
+document.getElementById('go').onclick=async function(){this.disabled=true;try{
+ if(!tok()){log('no token');return;}
+ var r=await gh('contents/strategic-partners.html?ref='+BRANCH+'&t='+Date.now());var j=await r.json();var sha=j.sha;var html=ub64(j.content);
+ html=html.split("fetch('data/partners.json')").join("fetch('/data/partners.json')");
+ html=html.replace(/var SEED=\{[\s\S]*?\n\};/, NEWSEED);
+ for(var a=0;a<3;a++){var pr=await gh('contents/strategic-partners.html',{method:'PUT',body:JSON.stringify({message:'Fix partners data path (root-absolute) + Love Loyalty fallback',content:b64u(html),branch:BRANCH,sha:sha})});if(pr.ok){log('OK strategic-partners.html');break;}if(pr.status===409&&a<2){var g=await gh('contents/strategic-partners.html?ref='+BRANCH+'&t='+Date.now());var gj=await g.json();sha=gj.sha;html=ub64(gj.content);html=html.split("fetch('data/partners.json')").join("fetch('/data/partners.json')");html=html.replace(/var SEED=\{[\s\S]*?\n\};/, NEWSEED);continue;}log('ERR '+pr.status+' '+(await pr.text()).slice(0,140));break;}
+ log('Done.');
+}catch(e){log('ERROR '+e.message);}};
+</script></body></html>
