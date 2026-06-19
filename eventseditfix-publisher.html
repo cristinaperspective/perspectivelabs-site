@@ -1,0 +1,23 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Events editor preview fix</title>
+<style>body{font-family:system-ui;background:#111;color:#eee;padding:30px}button{background:#FF3D1F;color:#fff;border:0;padding:14px 28px;font-size:16px;border-radius:6px;cursor:pointer}#log{margin-top:20px;white-space:pre-wrap;font-family:monospace;font-size:12px}</style>
+</head><body><h2>Fix Events editor preview (neutralize 92vh hero balloon)</h2><button id="go">Deploy</button><div id="log"></div>
+<script>
+var OWNER='cristinaperspective',REPO='perspectiveevents-site',BRANCH='main';
+function log(m){document.getElementById('log').textContent+=m+"\n";}
+function tok(){return localStorage.getItem('pl_token')||'';}
+function gh(p,o){o=o||{};return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+p,{method:o.method||'GET',headers:{'Authorization':'token '+tok(),'Accept':'application/vnd.github+json'},body:o.body||undefined});}
+function b64u(s){return btoa(unescape(encodeURIComponent(s)));}
+function ub64(b){return decodeURIComponent(escape(atob(b.replace(/\n/g,''))));}
+async function getSha(p){var r=await gh('contents/'+p+'?ref='+BRANCH+'&t='+Date.now());if(r.status===200)return (await r.json()).sha;return null;}
+var FIND='html,body{overflow:visible !important;height:auto !important}';
+var REPL='html,body{overflow:visible !important;height:auto !important}.hero{min-height:0 !important}[style*="vh"]{min-height:0 !important}';
+document.getElementById('go').onclick=async function(){this.disabled=true;try{
+ if(!tok()){log('no token');return;}
+ var r=await gh('contents/editor.html?ref='+BRANCH+'&t='+Date.now());var j=await r.json();var sha=j.sha;var html=ub64(j.content);
+ if(html.indexOf('.hero{min-height:0')>-1){log('already fixed');return;}
+ if(html.indexOf(FIND)<0){log('WARN: scrollfix string not found, aborting (no change).');return;}
+ html=html.replace(FIND,REPL);
+ for(var a=0;a<3;a++){var pr=await gh('contents/editor.html',{method:'PUT',body:JSON.stringify({message:'Editor preview: neutralize vh hero so full page shows',content:b64u(html),branch:BRANCH,sha:sha})});if(pr.ok){log('OK editor.html');break;}if(pr.status===409&&a<2){var g=await gh('contents/editor.html?ref='+BRANCH+'&t='+Date.now());var gj=await g.json();sha=gj.sha;html=ub64(gj.content);if(html.indexOf('.hero{min-height:0')>-1){log('already fixed');return;}html=html.replace(FIND,REPL);continue;}log('ERR '+pr.status+' '+(await pr.text()).slice(0,140));break;}
+ log('Done.');
+}catch(e){log('ERROR '+e.message);}};
+</script></body></html>
