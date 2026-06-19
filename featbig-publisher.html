@@ -1,0 +1,27 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Featured logo bigger + linked</title>
+<style>body{font-family:system-ui;background:#111;color:#eee;padding:30px}button{background:#FF3D1F;color:#fff;border:0;padding:14px 28px;font-size:16px;border-radius:6px;cursor:pointer}#log{margin-top:20px;white-space:pre-wrap;font-family:monospace;font-size:12px}</style>
+</head><body><h2>Featured: bigger logo, smaller title, logo is a link</h2><button id="go">Deploy</button><div id="log"></div>
+<script>
+var OWNER='cristinaperspective',REPO='perspectivesocial',BRANCH='main';
+function log(m){document.getElementById('log').textContent+=m+"\n";}
+function tok(){return localStorage.getItem('pl_token')||'';}
+function gh(p,o){o=o||{};return fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/'+p,{method:o.method||'GET',headers:{'Authorization':'token '+tok(),'Accept':'application/vnd.github+json'},body:o.body||undefined});}
+function b64u(s){return btoa(unescape(encodeURIComponent(s)));}
+function ub64(b){return decodeURIComponent(escape(atob(b.replace(/\n/g,''))));}
+async function getSha(p){var r=await gh('contents/'+p+'?ref='+BRANCH+'&t='+Date.now());if(r.status===200)return (await r.json()).sha;return null;}
+var F1='max-height:74px;width:auto;max-width:200px;';
+var R1='max-height:128px;width:auto;max-width:280px;';
+var F2=".feat-card h3{font-family:'Anton',sans-serif;font-size:34px;";
+var R2=".feat-card h3{font-family:'Anton',sans-serif;font-size:23px;letter-spacing:.01em;";
+var F4=`(feat.image?'<img class="feat-logo" src="'+feat.image+'" alt="'+feat.name+'">':'')`;
+var R4=`(feat.image?(feat.link?'<a class="feat-logo-link" href="'+feat.link+'" target="_blank" rel="noopener">':'')+'<img class="feat-logo" src="'+feat.image+'" alt="'+feat.name+'">'+(feat.link?'</a>':''):'')`;
+async function run(){
+ var r=await gh('contents/strategic-partners.html?ref='+BRANCH+'&t='+Date.now());var j=await r.json();var sha=j.sha;var html=ub64(j.content);
+ if(html.indexOf(F1)<0)log('warn: feat-logo size string not found');
+ if(html.indexOf(F4)<0)log('warn: render-image string not found');
+ html=html.split(F1).join(R1).split(F2).join(R2).split(F4).join(R4);
+ if(html.indexOf('.feat-logo-link')<0||html.indexOf('.feat-logo-link{')<0){html=html.replace('</style>','.feat-logo-link{display:block;text-decoration:none;cursor:pointer}\n</style>');}
+ for(var a=0;a<3;a++){var pr=await gh('contents/strategic-partners.html',{method:'PUT',body:JSON.stringify({message:'Featured: bigger logo, smaller title, logo links out',content:b64u(html),branch:BRANCH,sha:sha})});if(pr.ok){log('OK strategic-partners.html');return;}if(pr.status===409&&a<2){var g=await gh('contents/strategic-partners.html?ref='+BRANCH+'&t='+Date.now());var gj=await g.json();sha=gj.sha;html=ub64(gj.content).split(F1).join(R1).split(F2).join(R2).split(F4).join(R4);if(html.indexOf('.feat-logo-link{')<0)html=html.replace('</style>','.feat-logo-link{display:block;text-decoration:none;cursor:pointer}\n</style>');continue;}throw new Error('sp '+pr.status);}
+}
+document.getElementById('go').onclick=async function(){this.disabled=true;try{if(!tok()){log('no token');return;}await run();log('Done.');}catch(e){log('ERROR '+e.message);}};
+</script></body></html>
